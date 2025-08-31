@@ -11,6 +11,7 @@ Features:
 from typing import List, Optional, Any, cast
 
 import markdown
+
 try:
     import pdfkit  # type: ignore[import-not-found]
 except Exception:  # pragma: no cover
