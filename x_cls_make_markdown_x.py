@@ -8,7 +8,7 @@ Features:
 - Optional PDF export using wkhtmltopdf via pdfkit
 """
 
-from typing import List, Optional, Any, cast
+from typing import Any, cast
 
 import markdown
 
@@ -21,11 +21,11 @@ except Exception:  # pragma: no cover
 class x_cls_make_markdown_x:
     """A simple markdown builder with an optional PDF export step."""
 
-    def __init__(self, wkhtmltopdf_path: Optional[str] = None) -> None:
-        self.elements: List[str] = []
-        self.toc: List[str] = []
-        self.section_counter: List[int] = []
-        self.wkhtmltopdf_path: Optional[str] = wkhtmltopdf_path
+    def __init__(self, wkhtmltopdf_path: str | None = None) -> None:
+        self.elements: list[str] = []
+        self.toc: list[str] = []
+        self.section_counter: list[int] = []
+        self.wkhtmltopdf_path: str | None = wkhtmltopdf_path
 
     def add_header(self, text: str, level: int = 1) -> None:
         """Add a header with hierarchical numbering and TOC update."""
@@ -52,7 +52,7 @@ class x_cls_make_markdown_x:
         """Add a paragraph to the markdown document."""
         self.elements.append(f"{text}\n\n")
 
-    def add_table(self, headers: List[str], rows: List[List[str]]) -> None:
+    def add_table(self, headers: list[str], rows: list[list[str]]) -> None:
         """Add a table to the markdown document."""
         header_row = " | ".join(headers)
         separator_row = " | ".join(["---"] * len(headers))
@@ -63,7 +63,7 @@ class x_cls_make_markdown_x:
         """Add an image to the markdown document."""
         self.elements.append(f"![{alt_text}]({url})\n\n")
 
-    def add_list(self, items: List[str], ordered: bool = False) -> None:
+    def add_list(self, items: list[str], ordered: bool = False) -> None:
         """Add a list to the markdown document."""
         if ordered:
             self.elements.extend([f"{i+1}. {item}" for i, item in enumerate(items)])
@@ -73,7 +73,7 @@ class x_cls_make_markdown_x:
 
     def add_toc(self) -> None:
         """Add a table of contents (TOC) to the top of the document."""
-        self.elements = ["\n".join(self.toc) + "\n\n"] + self.elements
+        self.elements = ["\n".join(self.toc) + "\n\n", *self.elements]
 
     def generate(self, output_file: str = "example.md") -> str:
         """Generate markdown and save it to a file; optionally render a PDF."""
