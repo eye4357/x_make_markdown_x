@@ -8,14 +8,8 @@ Features:
 - Optional PDF export using wkhtmltopdf via pdfkit
 """
 
-from typing import Any, cast
-
-import markdown
-
-try:
-    import pdfkit  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    pdfkit = None  # type: ignore[assignment]
+import importlib
+from typing import Any
 
 
 class x_cls_make_markdown_x:
@@ -82,10 +76,16 @@ class x_cls_make_markdown_x:
             f.write(markdown_content)
 
         # Convert to PDF if wkhtmltopdf_path is provided
-        if self.wkhtmltopdf_path and pdfkit is not None:
+        if self.wkhtmltopdf_path:
+            try:
+                _pdfkit: Any = importlib.import_module("pdfkit")
+                _markdown: Any = importlib.import_module("markdown")
+            except Exception:
+                # pdfkit/markdown not available; skip PDF generation gracefully
+                return markdown_content
+
             pdf_file = output_file.replace(".md", ".pdf")
-            html_content = markdown.markdown(markdown_content)
-            _pdfkit: Any = cast(Any, pdfkit)
+            html_content = _markdown.markdown(markdown_content)
             pdfkit_config = _pdfkit.configuration(wkhtmltopdf=self.wkhtmltopdf_path)
             _pdfkit.from_string(html_content, pdf_file, configuration=pdfkit_config)
 
