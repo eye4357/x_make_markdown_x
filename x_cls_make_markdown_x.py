@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Markdown document builder with optional PDF generation.
 
-Features:
+Features (redrabbit):
 - Headers with hierarchical numbering and TOC entries
 - Paragraphs, tables, images, lists
 - Optional PDF export using wkhtmltopdf via pdfkit
