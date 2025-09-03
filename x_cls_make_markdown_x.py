@@ -10,7 +10,8 @@ Features:
 
 import importlib
 from typing import Any
-'''red rabbit 2025_0902_0944'''
+
+"""red rabbit 2025_0902_0944"""
 
 
 class x_cls_make_markdown_x:
@@ -61,7 +62,7 @@ class x_cls_make_markdown_x:
     def add_list(self, items: list[str], ordered: bool = False) -> None:
         """Add a list to the markdown document."""
         if ordered:
-            self.elements.extend([f"{i+1}. {item}" for i, item in enumerate(items)])
+            self.elements.extend([f"{i + 1}. {item}" for i, item in enumerate(items)])
         else:
             self.elements.extend([f"- {item}" for item in items])
         self.elements.append("\n")
