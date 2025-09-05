@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Markdown document builder with optional PDF generation.
 
 Features (redrabbit):
@@ -8,10 +6,12 @@ Features (redrabbit):
 - Optional PDF export using wkhtmltopdf via pdfkit
 """
 
+from __future__ import annotations
+
 import importlib
 from typing import Any
 
-"""red rabbit 2025_0902_0944"""
+# red rabbit 2025_0902_0944
 
 
 class x_cls_make_markdown_x:
@@ -41,7 +41,8 @@ class x_cls_make_markdown_x:
         # Add header to elements and TOC
         self.elements.append(f"{'#' * level} {header_text}\n")
         self.toc.append(
-            f"{'  ' * (level - 1)}- [{header_text}](#{header_text.lower().replace(' ', '-').replace('.', '')})"
+            f"{'  ' * (level - 1)}- [{header_text}]"
+            f"(#{header_text.lower().replace(' ', '-').replace('.', '')})"
         )
 
     def add_paragraph(self, text: str) -> None:
