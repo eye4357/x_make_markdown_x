@@ -63,7 +63,9 @@ class x_cls_make_markdown_x:
     def add_list(self, items: list[str], ordered: bool = False) -> None:
         """Add a list to the markdown document."""
         if ordered:
-            self.elements.extend([f"{i + 1}. {item}" for i, item in enumerate(items)])
+            self.elements.extend(
+                [f"{i + 1}. {item}" for i, item in enumerate(items)]
+            )
         else:
             self.elements.extend([f"- {item}" for item in items])
         self.elements.append("\n")
@@ -89,8 +91,12 @@ class x_cls_make_markdown_x:
 
             pdf_file = output_file.replace(".md", ".pdf")
             html_content = _markdown.markdown(markdown_content)
-            pdfkit_config = _pdfkit.configuration(wkhtmltopdf=self.wkhtmltopdf_path)
-            _pdfkit.from_string(html_content, pdf_file, configuration=pdfkit_config)
+            pdfkit_config = _pdfkit.configuration(
+                wkhtmltopdf=self.wkhtmltopdf_path
+            )
+            _pdfkit.from_string(
+                html_content, pdf_file, configuration=pdfkit_config
+            )
 
         return markdown_content
 
