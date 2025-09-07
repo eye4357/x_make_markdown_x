@@ -9,18 +9,37 @@ Features (redrabbit):
 from __future__ import annotations
 
 import importlib
+import os
 from typing import Any
+
+
+# Minimal BaseMake fallback for environments without x_make_common_x.
+class BaseMake:
+    def get_env(self, name: str, default: str | None = None) -> str | None:
+        return os.environ.get(name, default)
+
+    def get_env_bool(self, name: str, default: bool = False) -> bool:
+        v = os.environ.get(name)
+        if v is None:
+            return default
+        return v.lower() in ("1", "true", "yes")
+
 
 # red rabbit 2025_0902_0944
 
 
-class x_cls_make_markdown_x:
+class x_cls_make_markdown_x(BaseMake):
     """A simple markdown builder with an optional PDF export step."""
+
+    # Default wkhtmltopdf location (can be overridden via env X_WKHTMLTOPDF_PATH)
+    WKHTMLTOPDF_ENV: str = "X_WKHTMLTOPDF_PATH"
 
     def __init__(self, wkhtmltopdf_path: str | None = None) -> None:
         self.elements: list[str] = []
         self.toc: list[str] = []
         self.section_counter: list[int] = []
+        if wkhtmltopdf_path is None:
+            wkhtmltopdf_path = self.get_env(self.WKHTMLTOPDF_ENV, None)
         self.wkhtmltopdf_path: str | None = wkhtmltopdf_path
 
     def add_header(self, text: str, level: int = 1) -> None:
