@@ -34,7 +34,16 @@ class x_cls_make_markdown_x(BaseMake):
     # Default wkhtmltopdf location (can be overridden via env X_WKHTMLTOPDF_PATH)
     WKHTMLTOPDF_ENV: str = "X_WKHTMLTOPDF_PATH"
 
-    def __init__(self, wkhtmltopdf_path: str | None = None) -> None:
+    def __init__(
+        self, wkhtmltopdf_path: str | None = None, ctx: object | None = None
+    ) -> None:
+        """Accept optional ctx for future orchestrator integration.
+
+        Backwards compatible: callers that don't pass ctx behave as before.
+        If ctx has a truthy `verbose` attribute this class will emit small
+        informational messages to stdout to help debugging in orchestrated runs.
+        """
+        self._ctx = ctx
         self.elements: list[str] = []
         self.toc: list[str] = []
         self.section_counter: list[int] = []
@@ -98,6 +107,9 @@ class x_cls_make_markdown_x(BaseMake):
         markdown_content = "".join(self.elements)
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(markdown_content)
+
+        if getattr(self._ctx, "verbose", False):
+            print(f"[markdown] wrote markdown to {output_file}")
 
         # Convert to PDF if wkhtmltopdf_path is provided
         if self.wkhtmltopdf_path:
