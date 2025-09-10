@@ -9,7 +9,6 @@ Features (redrabbit):
 from __future__ import annotations
 
 import importlib
-import os
 from typing import Any
 import os as _os
 import logging as _logging
