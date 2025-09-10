@@ -11,7 +11,39 @@ from __future__ import annotations
 import importlib
 import os
 from typing import Any
-from x_make_common_x.x_cls_make_common_x import BaseMake
+import os as _os
+import logging as _logging
+import sys as _sys
+
+_LOGGER = _logging.getLogger("x_make")
+
+
+class BaseMake:
+    @classmethod
+    def get_env(cls, name: str, default: Any = None) -> Any:
+        return _os.environ.get(name, default)
+
+    @classmethod
+    def get_env_bool(cls, name: str, default: bool = False) -> bool:
+        v = _os.environ.get(name)
+        if v is None:
+            return default
+        return str(v).lower() in ("1", "true", "yes")
+
+
+def _info(*args: object) -> None:
+    msg = " ".join(str(a) for a in args)
+    try:
+        _LOGGER.info("%s", msg)
+    except Exception:
+        pass
+    try:
+        print(msg)
+    except Exception:
+        try:
+            _sys.stdout.write(msg + "\n")
+        except Exception:
+            pass
 
 
 # red rabbit 2025_0902_0944
@@ -98,8 +130,6 @@ class x_cls_make_markdown_x(BaseMake):
             f.write(markdown_content)
 
         if getattr(self._ctx, "verbose", False):
-            from x_make_common_x.helpers import info as _info
-
             _info(f"[markdown] wrote markdown to {output_file}")
 
         # Convert to PDF if wkhtmltopdf_path is provided
