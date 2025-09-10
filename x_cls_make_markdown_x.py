@@ -11,18 +11,7 @@ from __future__ import annotations
 import importlib
 import os
 from typing import Any
-
-
-# Minimal BaseMake fallback for environments without x_make_common_x.
-class BaseMake:
-    def get_env(self, name: str, default: str | None = None) -> str | None:
-        return os.environ.get(name, default)
-
-    def get_env_bool(self, name: str, default: bool = False) -> bool:
-        v = os.environ.get(name)
-        if v is None:
-            return default
-        return v.lower() in ("1", "true", "yes")
+from x_make_common_x.x_cls_make_common_x import BaseMake
 
 
 # red rabbit 2025_0902_0944
@@ -109,7 +98,9 @@ class x_cls_make_markdown_x(BaseMake):
             f.write(markdown_content)
 
         if getattr(self._ctx, "verbose", False):
-            print(f"[markdown] wrote markdown to {output_file}")
+            from x_make_common_x.helpers import info as _info
+
+            _info(f"[markdown] wrote markdown to {output_file}")
 
         # Convert to PDF if wkhtmltopdf_path is provided
         if self.wkhtmltopdf_path:
