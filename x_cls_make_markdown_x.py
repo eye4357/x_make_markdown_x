@@ -54,7 +54,9 @@ class x_cls_make_markdown_x(BaseMake):
     # Environment variable to override wkhtmltopdf path
     WKHTMLTOPDF_ENV_VAR: str = "X_WKHTMLTOPDF_PATH"
     # Default Windows install path (used if present and env var not set)
-    DEFAULT_WKHTMLTOPDF_PATH: str = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+    DEFAULT_WKHTMLTOPDF_PATH: str = (
+        r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+    )
 
     def __init__(
         self, wkhtmltopdf_path: str | None = None, ctx: object | None = None
@@ -140,7 +142,9 @@ class x_cls_make_markdown_x(BaseMake):
 
     def to_pdf(self, html_str: str, out_path: str) -> None:
         """Render HTML to PDF using pdfkit + wkhtmltopdf; fail fast if unavailable."""
-        if not self.wkhtmltopdf_path or not _os.path.isfile(self.wkhtmltopdf_path):
+        if not self.wkhtmltopdf_path or not _os.path.isfile(
+            self.wkhtmltopdf_path
+        ):
             raise RuntimeError(
                 f"wkhtmltopdf not found (set {self.WKHTMLTOPDF_ENV_VAR} or install at default path)"
             )
@@ -148,7 +152,9 @@ class x_cls_make_markdown_x(BaseMake):
             _pdfkit: Any = importlib.import_module("pdfkit")
         except Exception as e:
             raise RuntimeError("pdfkit is required for PDF export") from e
-        _os.makedirs(_os.path.dirname(_os.path.abspath(out_path)) or ".", exist_ok=True)
+        _os.makedirs(
+            _os.path.dirname(_os.path.abspath(out_path)) or ".", exist_ok=True
+        )
         cfg = _pdfkit.configuration(wkhtmltopdf=self.wkhtmltopdf_path)
         _pdfkit.from_string(html_str, out_path, configuration=cfg)
 
@@ -182,7 +188,9 @@ if __name__ == "__main__":
     maker = x_cls_make_markdown_x(ctx=_Ctx())
 
     maker.add_header("Alice's Adventures in Wonderland", 1)
-    maker.add_paragraph("Public-domain sampler inspired by Lewis Carroll (1865).")
+    maker.add_paragraph(
+        "Public-domain sampler inspired by Lewis Carroll (1865)."
+    )
 
     maker.add_header("Down the Rabbit-Hole", 2)
     maker.add_paragraph(
