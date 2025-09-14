@@ -9,7 +9,7 @@ Features (redrabbit):
 from __future__ import annotations
 
 import importlib
-from typing import Any
+from typing import Any, cast
 import os as _os
 import logging as _logging
 import sys as _sys
@@ -135,7 +135,8 @@ class x_cls_make_markdown_x(BaseMake):
         """Convert markdown text to HTML using python-markdown; minimal fallback on failure."""
         try:
             _markdown: Any = importlib.import_module("markdown")
-            return _markdown.markdown(text or "")
+            val = _markdown.markdown(text or "")
+            return cast(str, val)
         except Exception:
             # Minimal fallback: return plain text wrapped in <pre> to preserve content
             return f"<pre>{(text or '').replace('<','&lt;').replace('>','&gt;')}</pre>"
