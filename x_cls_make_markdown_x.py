@@ -52,7 +52,7 @@ class x_cls_make_markdown_x(BaseMake):
     """A simple markdown builder with an optional PDF export step."""
 
     # Default wkhtmltopdf location (can be overridden via env X_WKHTMLTOPDF_PATH)
-    WKHTMLTOPDF_ENV: str = "X_WKHTMLTOPDF_PATH"
+    WKHTMLTOPDF_ENV: str = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
 
     def __init__(
         self, wkhtmltopdf_path: str | None = None, ctx: object | None = None
