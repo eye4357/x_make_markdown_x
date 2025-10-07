@@ -9,10 +9,10 @@ Features (redrabbit):
 from __future__ import annotations
 
 import importlib
-from typing import Any, cast
-import os as _os
 import logging as _logging
+import os as _os
 import sys as _sys
+from typing import Any, cast
 
 _LOGGER = _logging.getLogger("x_make")
 
@@ -136,7 +136,7 @@ class x_cls_make_markdown_x(BaseMake):
         try:
             _markdown: Any = importlib.import_module("markdown")
             val = _markdown.markdown(text or "")
-            return cast(str, val)
+            return cast("str", val)
         except Exception:
             # Minimal fallback: return plain text wrapped in <pre> to preserve content
             return f"<pre>{(text or '').replace('<','&lt;').replace('>','&gt;')}</pre>"
