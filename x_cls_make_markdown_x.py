@@ -12,19 +12,27 @@ import importlib
 import logging as _logging
 import os as _os
 import sys as _sys
-from typing import Any, cast
+from contextlib import suppress
+from pathlib import Path
+from typing import Protocol, TypeVar, cast
 
 _LOGGER = _logging.getLogger("x_make")
 
 
+_T = TypeVar("_T")
+
+
 class BaseMake:
     @classmethod
-    def get_env(cls, name: str, default: Any = None) -> Any:
-        return _os.environ.get(name, default)
+    def get_env(cls, name: str, default: _T | None = None) -> str | _T | None:
+        value = _os.environ.get(name)
+        if value is None:
+            return default
+        return value
 
     @classmethod
-    def get_env_bool(cls, name: str, default: bool = False) -> bool:
-        v = _os.environ.get(name)
+    def get_env_bool(cls, name: str, *, default: bool = False) -> bool:
+        v = cls.get_env(name)
         if v is None:
             return default
         return str(v).lower() in ("1", "true", "yes")
@@ -32,31 +40,56 @@ class BaseMake:
 
 def _info(*args: object) -> None:
     msg = " ".join(str(a) for a in args)
-    try:
+    with suppress(Exception):
         _LOGGER.info("%s", msg)
-    except Exception:
-        pass
+    if not _emit_print(msg):
+        with suppress(Exception):
+            _sys.stdout.write(msg + "\n")
+
+
+def _emit_print(msg: str) -> bool:
     try:
         print(msg)
-    except Exception:
-        try:
-            _sys.stdout.write(msg + "\n")
-        except Exception:
-            pass
+    except (OSError, RuntimeError):
+        return False
+    return True
+
+
+def _ctx_is_verbose(ctx: object | None) -> bool:
+    """Return True if the context exposes a truthy `verbose` attribute."""
+    attr = cast("object", getattr(ctx, "verbose", False))
+    if isinstance(attr, bool):
+        return attr
+    return bool(attr)
 
 
 # red rabbit 2025_0902_0944
 
 
-class x_cls_make_markdown_x(BaseMake):
+class MarkdownModule(Protocol):
+    def markdown(self, text: str) -> str: ...
+
+
+class PdfkitModule(Protocol):
+    def configuration(self, *, wkhtmltopdf: str) -> object: ...
+
+    def from_string(
+        self,
+        html_str: str,
+        out_path: str,
+        *,
+        configuration: object,
+    ) -> None: ...
+
+
+class XClsMakeMarkdownX(BaseMake):
     """A simple markdown builder with an optional PDF export step."""
 
     # Environment variable to override wkhtmltopdf path
     WKHTMLTOPDF_ENV_VAR: str = "X_WKHTMLTOPDF_PATH"
     # Default Windows install path (used if present and env var not set)
-    DEFAULT_WKHTMLTOPDF_PATH: str = (
-        r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
-    )
+    DEFAULT_WKHTMLTOPDF_PATH: str = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+    HEADER_MAX_LEVEL: int = 6
 
     def __init__(
         self, wkhtmltopdf_path: str | None = None, ctx: object | None = None
@@ -71,19 +104,26 @@ class x_cls_make_markdown_x(BaseMake):
         self.elements: list[str] = []
         self.toc: list[str] = []
         self.section_counter: list[int] = []
+        resolved_path: str | None
         if wkhtmltopdf_path is None:
-            env_path = self.get_env(self.WKHTMLTOPDF_ENV_VAR, None)
-            wkhtmltopdf_path = env_path or (
-                self.DEFAULT_WKHTMLTOPDF_PATH
-                if _os.path.isfile(self.DEFAULT_WKHTMLTOPDF_PATH)
-                else None
-            )
-        self.wkhtmltopdf_path: str | None = wkhtmltopdf_path
+            env_value = self.get_env(self.WKHTMLTOPDF_ENV_VAR)
+            env_candidate = Path(env_value) if isinstance(env_value, str) else None
+            default_candidate = Path(self.DEFAULT_WKHTMLTOPDF_PATH)
+            if env_candidate and env_candidate.is_file():
+                resolved_path = str(env_candidate)
+            elif default_candidate.is_file():
+                resolved_path = str(default_candidate)
+            else:
+                resolved_path = None
+        else:
+            resolved_path = wkhtmltopdf_path
+        self.wkhtmltopdf_path: str | None = resolved_path
 
     def add_header(self, text: str, level: int = 1) -> None:
         """Add a header with hierarchical numbering and TOC update."""
-        if level > 6:
-            raise ValueError("Header level cannot exceed 6.")
+        if level > self.HEADER_MAX_LEVEL:
+            message = f"Header level cannot exceed {self.HEADER_MAX_LEVEL}."
+            raise ValueError(message)
 
         # Update section counter
         while len(self.section_counter) < level:
@@ -117,12 +157,10 @@ class x_cls_make_markdown_x(BaseMake):
         """Add an image to the markdown document."""
         self.elements.append(f"![{alt_text}]({url})\n\n")
 
-    def add_list(self, items: list[str], ordered: bool = False) -> None:
+    def add_list(self, items: list[str], *, ordered: bool = False) -> None:
         """Add a list to the markdown document."""
         if ordered:
-            self.elements.extend(
-                [f"{i + 1}. {item}" for i, item in enumerate(items)]
-            )
+            self.elements.extend([f"{i + 1}. {item}" for i, item in enumerate(items)])
         else:
             self.elements.extend([f"- {item}" for item in items])
         self.elements.append("\n")
@@ -132,40 +170,51 @@ class x_cls_make_markdown_x(BaseMake):
         self.elements = ["\n".join(self.toc) + "\n\n", *self.elements]
 
     def to_html(self, text: str) -> str:
-        """Convert markdown text to HTML using python-markdown; minimal fallback on failure."""
+        """Convert markdown text to HTML using python-markdown."""
         try:
-            _markdown: Any = importlib.import_module("markdown")
-            val = _markdown.markdown(text or "")
-            return cast("str", val)
-        except Exception:
+            markdown_module = cast(
+                "MarkdownModule",
+                importlib.import_module("markdown"),
+            )
+            return markdown_module.markdown(text or "")
+        except (ModuleNotFoundError, AttributeError, TypeError, ValueError):
             # Minimal fallback: return plain text wrapped in <pre> to preserve content
-            return f"<pre>{(text or '').replace('<','&lt;').replace('>','&gt;')}</pre>"
+            escaped = (text or "").replace("<", "&lt;").replace(">", "&gt;")
+            return f"<pre>{escaped}</pre>"
 
     def to_pdf(self, html_str: str, out_path: str) -> None:
-        """Render HTML to PDF using pdfkit + wkhtmltopdf; fail fast if unavailable."""
-        if not self.wkhtmltopdf_path or not _os.path.isfile(
-            self.wkhtmltopdf_path
-        ):
-            raise RuntimeError(
-                f"wkhtmltopdf not found (set {self.WKHTMLTOPDF_ENV_VAR} or install at default path)"
+        """Render HTML to PDF using pdfkit + wkhtmltopdf."""
+        if not self.wkhtmltopdf_path:
+            message = (
+                f"wkhtmltopdf not found (set {self.WKHTMLTOPDF_ENV_VAR}"
+                " or install at default path)"
             )
+            raise RuntimeError(message)
+        wkhtmltopdf_candidate = Path(self.wkhtmltopdf_path)
+        if not wkhtmltopdf_candidate.is_file():
+            message = f"wkhtmltopdf binary not found at {self.wkhtmltopdf_path}"
+            raise RuntimeError(message)
         try:
-            _pdfkit: Any = importlib.import_module("pdfkit")
+            pdfkit_module = cast(
+                "PdfkitModule",
+                importlib.import_module("pdfkit"),
+            )
         except Exception as e:
-            raise RuntimeError("pdfkit is required for PDF export") from e
-        _os.makedirs(
-            _os.path.dirname(_os.path.abspath(out_path)) or ".", exist_ok=True
-        )
-        cfg = _pdfkit.configuration(wkhtmltopdf=self.wkhtmltopdf_path)
-        _pdfkit.from_string(html_str, out_path, configuration=cfg)
+            message = "pdfkit is required for PDF export"
+            raise RuntimeError(message) from e
+        out_path_obj = Path(out_path)
+        out_dir = out_path_obj.parent.resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        cfg = pdfkit_module.configuration(wkhtmltopdf=self.wkhtmltopdf_path)
+        pdfkit_module.from_string(html_str, str(out_path_obj), configuration=cfg)
 
     def generate(self, output_file: str = "example.md") -> str:
         """Generate markdown and save it to a file; optionally render a PDF."""
         markdown_content = "".join(self.elements)
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(markdown_content)
+        output_path = Path(output_file)
+        output_path.write_text(markdown_content, encoding="utf-8")
 
-        if getattr(self._ctx, "verbose", False):
+        if _ctx_is_verbose(self._ctx):
             _info(f"[markdown] wrote markdown to {output_file}")
 
         # Convert to PDF if wkhtmltopdf_path is configured
@@ -179,19 +228,17 @@ class x_cls_make_markdown_x(BaseMake):
 
 if __name__ == "__main__":
     # Rich example: Alice in Wonderland sampler -> Markdown + PDF beside this file
-    base_dir = _os.path.dirname(_os.path.abspath(__file__))
-    out_dir = _os.path.join(base_dir, "out_docs")
-    _os.makedirs(out_dir, exist_ok=True)
+    base_dir = Path(__file__).resolve().parent
+    out_dir = base_dir / "out_docs"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     class _Ctx:
         verbose = True
 
-    maker = x_cls_make_markdown_x(ctx=_Ctx())
+    maker = XClsMakeMarkdownX(ctx=_Ctx())
 
     maker.add_header("Alice's Adventures in Wonderland", 1)
-    maker.add_paragraph(
-        "Public-domain sampler inspired by Lewis Carroll (1865)."
-    )
+    maker.add_paragraph("Public-domain sampler inspired by Lewis Carroll (1865).")
 
     maker.add_header("Down the Rabbit-Hole", 2)
     maker.add_paragraph(
@@ -211,7 +258,8 @@ if __name__ == "__main__":
 
     maker.add_header("A Curious Bottle", 2)
     maker.add_paragraph(
-        'On a little table she found a bottle, on it was a paper label, with the words "DRINK ME" beautifully printed on it.'
+        "On a little table she found a bottle, on it was a paper label, "
+        'with the words "DRINK ME" beautifully printed on it.'
     )
 
     maker.add_table(
@@ -230,16 +278,21 @@ if __name__ == "__main__":
 
     maker.add_header("Conclusion", 2)
     maker.add_paragraph(
-        "This document demonstrates headers with numbering and TOC, lists, tables, and images."
+        "This document demonstrates headers with numbering and TOC, "
+        "lists, tables, and images."
     )
 
     # Insert TOC at the top after all headers were added
     maker.add_toc()
 
-    output_md = _os.path.join(out_dir, "alice_in_wonderland.md")
-    maker.generate(output_file=output_md)
+    output_md = out_dir / "alice_in_wonderland.md"
+    maker.generate(output_file=str(output_md))
 
     if not maker.wkhtmltopdf_path:
         _info(
-            f"[markdown] PDF not generated: set {x_cls_make_markdown_x.WKHTMLTOPDF_ENV_VAR} to wkhtmltopdf.exe"
+            "[markdown] PDF not generated: set "
+            f"{XClsMakeMarkdownX.WKHTMLTOPDF_ENV_VAR} to wkhtmltopdf.exe"
         )
+
+
+x_cls_make_markdown_x = XClsMakeMarkdownX
