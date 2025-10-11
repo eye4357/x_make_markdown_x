@@ -1,10 +1,14 @@
 """Tests for the Markdown document builder."""
 
+# ruff: noqa: S101 - assertions are the preferred testing primitive here
+
 from __future__ import annotations
 
 import importlib
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn
+
+import pytest
 
 from x_make_markdown_x.x_cls_make_markdown_x import XClsMakeMarkdownX
 
@@ -24,35 +28,33 @@ def test_generate_writes_markdown_and_toc(tmp_path: Path) -> None:
     markdown_text = builder.generate(output_file=str(output_md))
 
     written = output_md.read_text(encoding="utf-8")
-    if written != markdown_text:
-        raise AssertionError("generated markdown should match file contents")
-    if not markdown_text.startswith("- [1 Intro]"):
-        raise AssertionError("TOC should start with Intro header entry")
-    if "1.1 Details" not in markdown_text:
-        raise AssertionError("Nested header should appear in generated TOC")
-    if (tmp_path / "doc.pdf").exists():
-        raise AssertionError("PDF should not be created without wkhtmltopdf")
+    assert written == markdown_text, "generated markdown should match file contents"
+    assert markdown_text.startswith(
+        "- [1 Intro]"
+    ), "TOC should start with Intro header entry"
+    assert (
+        "1.1 Details" in markdown_text
+    ), "Nested header should appear in generated TOC"
+    assert not (
+        tmp_path / "doc.pdf"
+    ).exists(), "PDF should not be created without wkhtmltopdf"
 
 
 def test_to_html_fallback_when_markdown_missing(monkeypatch: MonkeyPatch) -> None:
     builder = XClsMakeMarkdownX()
 
-    def fake_import(name: str, package: str | None = None) -> NoReturn:  # noqa: ARG001
-        raise ModuleNotFoundError("markdown unavailable")
+    def fake_import(_name: str, _package: str | None = None) -> NoReturn:
+        raise ModuleNotFoundError from None
 
     monkeypatch.setattr(importlib, "import_module", fake_import)
 
     result = builder.to_html("<b>bold</b>")
 
-    if not result.startswith("<pre>"):
-        raise AssertionError("fallback should wrap output in <pre> tag")
-    if "&lt;b&gt;bold&lt;/b&gt;" not in result:
-        raise AssertionError("fallback should escape HTML content")
+    assert result.startswith("<pre>"), "fallback should wrap output in <pre> tag"
+    assert "&lt;b&gt;bold&lt;/b&gt;" in result, "fallback should escape HTML content"
 
 
 def test_to_pdf_requires_existing_wkhtmltopdf(tmp_path: Path) -> None:
-    import pytest
-
     builder = XClsMakeMarkdownX(wkhtmltopdf_path=str(tmp_path / "missing.exe"))
 
     with pytest.raises(RuntimeError, match="binary not found"):
@@ -63,14 +65,12 @@ def test_to_pdf_raises_when_pdfkit_unavailable(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
-    import pytest
-
     wkhtmltopdf = tmp_path / "wkhtmltopdf.exe"
     wkhtmltopdf.write_text("binary")
     builder = XClsMakeMarkdownX(wkhtmltopdf_path=str(wkhtmltopdf))
 
-    def fake_import(name: str, package: str | None = None) -> NoReturn:  # noqa: ARG001
-        raise ImportError("pdfkit missing")
+    def fake_import(_name: str, _package: str | None = None) -> NoReturn:
+        raise ImportError from None
 
     monkeypatch.setattr(importlib, "import_module", fake_import)
 
@@ -101,9 +101,7 @@ def test_to_pdf_invokes_pdfkit_when_available(
             Path(out_path).write_text("PDF", encoding="utf-8")
             captured["config"] = configuration
 
-    def load_pdfkit(
-        name: str, package: str | None = None
-    ) -> FakePdfKit:
+    def load_pdfkit(_name: str, _package: str | None = None) -> FakePdfKit:
         return FakePdfKit()
 
     monkeypatch.setattr(importlib, "import_module", load_pdfkit)
@@ -111,14 +109,16 @@ def test_to_pdf_invokes_pdfkit_when_available(
     out_pdf = tmp_path / "out.pdf"
     builder.to_pdf("<html><body>hi</body></html>", str(out_pdf))
 
-    if not out_pdf.exists():
-        raise AssertionError("PDF output file should be created")
-    if out_pdf.read_text(encoding="utf-8") != "PDF":
-        raise AssertionError("PDF placeholder content should be written")
-    if captured.get("wkhtmltopdf") != str(wkhtmltopdf):
-        raise AssertionError("wkhtmltopdf path should be passed to pdfkit")
+    assert out_pdf.exists(), "PDF output file should be created"
+    assert (
+        out_pdf.read_text(encoding="utf-8") == "PDF"
+    ), "PDF placeholder content should be written"
+    assert captured.get("wkhtmltopdf") == str(
+        wkhtmltopdf
+    ), "wkhtmltopdf path should be passed to pdfkit"
     html = captured.get("html")
-    if not isinstance(html, str) or not html.startswith("<html>"):
-        raise AssertionError("HTML content should be forwarded to pdfkit")
-    if captured.get("out_path") != str(out_pdf):
-        raise AssertionError("Output path should be forwarded to pdfkit")
+    assert isinstance(html, str), "HTML content should be forwarded to pdfkit"
+    assert html.startswith("<html>"), "HTML content should be forwarded to pdfkit"
+    assert captured.get("out_path") == str(
+        out_pdf
+    ), "Output path should be forwarded to pdfkit"
