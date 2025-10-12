@@ -40,7 +40,9 @@ def test_generate_writes_markdown_and_toc(tmp_path: Path) -> None:
     ).exists(), "PDF should not be created without wkhtmltopdf"
 
 
-def test_to_html_fallback_when_markdown_missing(monkeypatch: MonkeyPatch) -> None:
+def test_to_html_fallback_when_markdown_missing(
+    monkeypatch: MonkeyPatch,
+) -> None:
     builder = XClsMakeMarkdownX()
 
     def fake_import(_name: str, _package: str | None = None) -> NoReturn:
