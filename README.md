@@ -1,9 +1,9 @@
-# x_make_markdown_x — Lab Notes from Walter White
+# x_make_markdown_x — Control Room Lab Notes
 
 > "If the documentation isn't as tight as the cook, the operation falls apart. This rig keeps the words as sharp as the product."
 
 ## Manifesto
-x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.0 truth with consistent structure and zero wasted motion.
+x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.1 truth with consistent structure and zero wasted motion.
 
 ## Ingredients
 - Python 3.11+
@@ -28,8 +28,8 @@ x_make_markdown_x automates Markdown generation—component registries, PDF expo
 
 ## Distribution Chain
 - [Changelog](./CHANGELOG.md)
-- [Road to 0.20.0 Control Room](../x_0_make_all_x/Change%20Control/0.20.0/index.md)
-- [Road to 0.20.0 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.0/Road%20to%200.20.0%20Engineering%20Proposal%20-%20Walter%20White.md)
+- [Road to 0.20.1 Control Room Ledger](../x_0_make_all_x/Change%20Control/0.20.1/Road%20to%200.20.1%20Engineering%20Proposal.md)
+- [Road to 0.20.1 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.1/Road%20to%200.20.1%20Engineering%20Proposal.md)
 
 ## Cross-Linked Intelligence
 - [x_make_graphviz_x](../x_make_graphviz_x/README.md) — feeds diagrams straight into Markdown drops
