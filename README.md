@@ -3,7 +3,10 @@
 > "If the documentation isn't as tight as the cook, the operation falls apart. This rig keeps the words as sharp as the product."
 
 ## Manifesto
-x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.1 truth with consistent structure and zero wasted motion.
+x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.2 truth with consistent structure and zero wasted motion.
+
+## 0.20.2 Command Sequence
+Version 0.20.2 gives every document the same ruthless clarity I use on the line. This README mirrors the Road to 0.20.2 brief—no drift, no ambiguity, just controlled output ready for distribution.
 
 ## Ingredients
 - Python 3.11+
@@ -28,8 +31,8 @@ x_make_markdown_x automates Markdown generation—component registries, PDF expo
 
 ## Distribution Chain
 - [Changelog](./CHANGELOG.md)
-- [Road to 0.20.1 Control Room Ledger](../x_0_make_all_x/Change%20Control/0.20.1/Road%20to%200.20.1%20Engineering%20Proposal.md)
-- [Road to 0.20.1 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.1/Road%20to%200.20.1%20Engineering%20Proposal.md)
+- [Road to 0.20.2 Control Room Ledger](../x_0_make_all_x/Change%20Control/0.20.2/Road%20to%200.20.2%20Engineering%20Proposal.md)
+- [Road to 0.20.2 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.2/Road%20to%200.20.2%20Engineering%20Proposal.md)
 
 ## Cross-Linked Intelligence
 - [x_make_graphviz_x](../x_make_graphviz_x/README.md) — feeds diagrams straight into Markdown drops
