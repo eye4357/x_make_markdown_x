@@ -16,6 +16,13 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Protocol, TypeVar, cast
 
+from x_make_common_x.exporters import (
+    CommandRunner,
+    ExportResult,
+    export_html_to_pdf,
+    export_markdown_to_pdf,
+)
+
 _LOGGER = _logging.getLogger("x_make")
 
 
@@ -70,18 +77,6 @@ class MarkdownModule(Protocol):
     def markdown(self, text: str) -> str: ...
 
 
-class PdfkitModule(Protocol):
-    def configuration(self, *, wkhtmltopdf: str) -> object: ...
-
-    def from_string(
-        self,
-        html_str: str,
-        out_path: str,
-        *,
-        configuration: object,
-    ) -> None: ...
-
-
 class XClsMakeMarkdownX(BaseMake):
     """A simple markdown builder with an optional PDF export step."""
 
@@ -92,7 +87,11 @@ class XClsMakeMarkdownX(BaseMake):
     HEADER_MAX_LEVEL: int = 6
 
     def __init__(
-        self, wkhtmltopdf_path: str | None = None, ctx: object | None = None
+        self,
+        wkhtmltopdf_path: str | None = None,
+        ctx: object | None = None,
+        *,
+        runner: CommandRunner | None = None,
     ) -> None:
         """Accept optional ctx for future orchestrator integration.
 
@@ -104,6 +103,8 @@ class XClsMakeMarkdownX(BaseMake):
         self.elements: list[str] = []
         self.toc: list[str] = []
         self.section_counter: list[int] = []
+        self._runner: CommandRunner | None = runner
+        self._last_export_result: ExportResult | None = None
         resolved_path: str | None
         if wkhtmltopdf_path is None:
             env_value = self.get_env(self.WKHTMLTOPDF_ENV_VAR)
@@ -183,30 +184,27 @@ class XClsMakeMarkdownX(BaseMake):
             return f"<pre>{escaped}</pre>"
 
     def to_pdf(self, html_str: str, out_path: str) -> None:
-        """Render HTML to PDF using pdfkit + wkhtmltopdf."""
+        """Render HTML to PDF using the shared exporter pipeline."""
         if not self.wkhtmltopdf_path:
             message = (
                 f"wkhtmltopdf not found (set {self.WKHTMLTOPDF_ENV_VAR}"
                 " or install at default path)"
             )
             raise RuntimeError(message)
-        wkhtmltopdf_candidate = Path(self.wkhtmltopdf_path)
-        if not wkhtmltopdf_candidate.is_file():
-            message = f"wkhtmltopdf binary not found at {self.wkhtmltopdf_path}"
-            raise RuntimeError(message)
-        try:
-            pdfkit_module = cast(
-                "PdfkitModule",
-                importlib.import_module("pdfkit"),
-            )
-        except Exception as e:
-            message = "pdfkit is required for PDF export"
-            raise RuntimeError(message) from e
-        out_path_obj = Path(out_path)
-        out_dir = out_path_obj.parent.resolve()
-        out_dir.mkdir(parents=True, exist_ok=True)
-        cfg = pdfkit_module.configuration(wkhtmltopdf=self.wkhtmltopdf_path)
-        pdfkit_module.from_string(html_str, str(out_path_obj), configuration=cfg)
+        pdf_path = Path(out_path)
+        export_dir = pdf_path.parent
+        result: ExportResult = export_html_to_pdf(
+            html_str,
+            output_dir=export_dir,
+            stem=pdf_path.stem,
+            wkhtmltopdf_path=self.wkhtmltopdf_path,
+            runner=self._runner,
+            keep_html=False,
+        )
+        self._last_export_result = result
+        if not result.succeeded:
+            detail = result.detail or "wkhtmltopdf execution failed"
+            raise RuntimeError(detail)
 
     def generate(self, output_file: str = "example.md") -> str:
         """Generate markdown and save it to a file; optionally render a PDF."""
@@ -219,11 +217,25 @@ class XClsMakeMarkdownX(BaseMake):
 
         # Convert to PDF if wkhtmltopdf_path is configured
         if self.wkhtmltopdf_path:
-            html_content = self.to_html(markdown_content)
-            pdf_file = output_file.replace(".md", ".pdf")
-            self.to_pdf(html_content, pdf_file)
+            result = export_markdown_to_pdf(
+                markdown_content,
+                output_dir=output_path.parent,
+                stem=output_path.stem,
+                wkhtmltopdf_path=self.wkhtmltopdf_path,
+                runner=self._runner,
+                keep_html=False,
+            )
+            self._last_export_result = result
+            if not result.succeeded:
+                detail = result.detail or "Failed to render markdown to PDF"
+                raise RuntimeError(detail)
+        else:
+            self._last_export_result = None
 
         return markdown_content
+
+    def get_last_export_result(self) -> ExportResult | None:
+        return self._last_export_result
 
 
 if __name__ == "__main__":

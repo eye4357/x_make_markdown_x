@@ -5,10 +5,13 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Sequence
 from pathlib import Path
+from subprocess import CompletedProcess
 from typing import TYPE_CHECKING, NoReturn
 
 import pytest
+from x_make_common_x import exporters
 
 from x_make_markdown_x.x_cls_make_markdown_x import XClsMakeMarkdownX
 
@@ -38,6 +41,7 @@ def test_generate_writes_markdown_and_toc(tmp_path: Path) -> None:
     assert not (
         tmp_path / "doc.pdf"
     ).exists(), "PDF should not be created without wkhtmltopdf"
+    assert builder.get_last_export_result() is None
 
 
 def test_to_html_fallback_when_markdown_missing(
@@ -56,71 +60,63 @@ def test_to_html_fallback_when_markdown_missing(
     assert "&lt;b&gt;bold&lt;/b&gt;" in result, "fallback should escape HTML content"
 
 
-def test_to_pdf_requires_existing_wkhtmltopdf(tmp_path: Path) -> None:
+def test_to_pdf_requires_existing_wkhtmltopdf(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
     builder = XClsMakeMarkdownX(wkhtmltopdf_path=str(tmp_path / "missing.exe"))
+
+    def _no_binary(**_: object) -> Path | None:
+        return None
+
+    monkeypatch.setattr(exporters, "_resolve_binary", _no_binary)
 
     with pytest.raises(RuntimeError, match="binary not found"):
         builder.to_pdf("<html></html>", str(tmp_path / "out.pdf"))
 
-
-def test_to_pdf_raises_when_pdfkit_unavailable(
-    tmp_path: Path,
-    monkeypatch: MonkeyPatch,
-) -> None:
+def test_to_pdf_invokes_shared_exporter(tmp_path: Path) -> None:
     wkhtmltopdf = tmp_path / "wkhtmltopdf.exe"
-    wkhtmltopdf.write_text("binary")
-    builder = XClsMakeMarkdownX(wkhtmltopdf_path=str(wkhtmltopdf))
+    wkhtmltopdf.write_text("binary", encoding="utf-8")
 
-    def fake_import(_name: str, _package: str | None = None) -> NoReturn:
-        raise ImportError from None
+    captured: dict[str, Sequence[str]] = {}
 
-    monkeypatch.setattr(importlib, "import_module", fake_import)
+    def runner(command: Sequence[str]) -> CompletedProcess[str]:
+        captured["command"] = command
+        Path(command[-1]).write_text("PDF", encoding="utf-8")
+        return CompletedProcess(list(command), 0, stdout="ok", stderr="")
 
-    with pytest.raises(RuntimeError, match="pdfkit is required"):
-        builder.to_pdf("<html></html>", str(tmp_path / "out.pdf"))
-
-
-def test_to_pdf_invokes_pdfkit_when_available(
-    tmp_path: Path,
-    monkeypatch: MonkeyPatch,
-) -> None:
-    wkhtmltopdf = tmp_path / "wkhtmltopdf.exe"
-    wkhtmltopdf.write_text("binary")
-    builder = XClsMakeMarkdownX(wkhtmltopdf_path=str(wkhtmltopdf))
-
-    captured: dict[str, object] = {}
-
-    class FakePdfKit:
-        def configuration(self, *, wkhtmltopdf: str) -> object:
-            captured["wkhtmltopdf"] = wkhtmltopdf
-            return {"wkhtmltopdf": wkhtmltopdf}
-
-        def from_string(
-            self, html_str: str, out_path: str, *, configuration: object
-        ) -> None:
-            captured["html"] = html_str
-            captured["out_path"] = out_path
-            Path(out_path).write_text("PDF", encoding="utf-8")
-            captured["config"] = configuration
-
-    def load_pdfkit(_name: str, _package: str | None = None) -> FakePdfKit:
-        return FakePdfKit()
-
-    monkeypatch.setattr(importlib, "import_module", load_pdfkit)
+    builder = XClsMakeMarkdownX(
+        wkhtmltopdf_path=str(wkhtmltopdf),
+        runner=runner,
+    )
 
     out_pdf = tmp_path / "out.pdf"
     builder.to_pdf("<html><body>hi</body></html>", str(out_pdf))
 
     assert out_pdf.exists(), "PDF output file should be created"
-    assert (
-        out_pdf.read_text(encoding="utf-8") == "PDF"
-    ), "PDF placeholder content should be written"
-    assert captured.get("wkhtmltopdf") == str(
-        wkhtmltopdf
-    ), "wkhtmltopdf path should be passed to pdfkit"
-    html = captured.get("html")
-    assert isinstance(html, str), "HTML content should be forwarded to pdfkit"
-    assert html.startswith("<html>"), "HTML content should be forwarded to pdfkit"
-    assert captured.get("out_path") == str(
-        out_pdf
-    ), "Output path should be forwarded to pdfkit"
+    assert builder.get_last_export_result() is not None
+    last_result = builder.get_last_export_result()
+    assert last_result and last_result.succeeded is True
+    assert captured["command"][-1].endswith("out.pdf")
+
+
+def test_generate_records_export_result(tmp_path: Path) -> None:
+    wkhtmltopdf = tmp_path / "wkhtmltopdf.exe"
+    wkhtmltopdf.write_text("binary", encoding="utf-8")
+
+    def runner(command: Sequence[str]) -> CompletedProcess[str]:
+        Path(command[-1]).write_text("PDF", encoding="utf-8")
+        return CompletedProcess(list(command), 0, stdout="ok", stderr="")
+
+    builder = XClsMakeMarkdownX(
+        wkhtmltopdf_path=str(wkhtmltopdf),
+        runner=runner,
+    )
+    builder.add_header("Intro")
+
+    output_md = tmp_path / "doc.md"
+    builder.generate(output_file=str(output_md))
+
+    result = builder.get_last_export_result()
+    assert result is not None
+    assert result.succeeded is True
+    assert result.output_path == tmp_path / "doc.pdf"
