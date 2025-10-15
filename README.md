@@ -3,10 +3,10 @@
 > "If the documentation isn't as tight as the cook, the operation falls apart. This rig keeps the words as sharp as the product."
 
 ## Manifesto
-x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.2 truth with consistent structure and zero wasted motion.
+x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.3 truth with consistent structure and zero wasted motion.
 
-## 0.20.2 Command Sequence
-Version 0.20.2 gives every document the same ruthless clarity I use on the line. This README mirrors the Road to 0.20.2 brief—no drift, no ambiguity, just controlled output ready for distribution.
+## 0.20.3 Command Sequence
+Version 0.20.3 hardens every template against the JSON-first release. The generator now references the refreshed control room dossier and syncs with the visitor's per-file telemetry so documentation reflects the exact state of the lab.
 
 ## Ingredients
 - Python 3.11+
@@ -31,8 +31,8 @@ Version 0.20.2 gives every document the same ruthless clarity I use on the line.
 
 ## Distribution Chain
 - [Changelog](./CHANGELOG.md)
-- [Road to 0.20.2 Control Room Ledger](../x_0_make_all_x/Change%20Control/0.20.2/Road%20to%200.20.2%20Engineering%20Proposal.md)
-- [Road to 0.20.2 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.2/Road%20to%200.20.2%20Engineering%20Proposal.md)
+- [Road to 0.20.3 Control Room Ledger](../x_0_make_all_x/Change%20Control/0.20.3/Road%20to%200.20.3%20Engineering%20Proposal.md)
+- [Road to 0.20.3 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.3/Road%20to%200.20.3%20Engineering%20Proposal.md)
 
 ## Cross-Linked Intelligence
 - [x_make_graphviz_x](../x_make_graphviz_x/README.md) — feeds diagrams straight into Markdown drops

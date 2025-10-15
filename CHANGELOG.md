@@ -2,6 +2,10 @@
 
 All notable changes to x_make_markdown_x stay right here. We observe [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning because documentation deserves first-class control.
 
+## [0.20.3] - 2025-10-14
+### Changed
+- README and release notes rewritten to match the Road to 0.20.3 documentation cadence and acknowledge the JSON telemetry pivot.
+
 ## [0.20.2] - 2025-10-14
 ### Changed
 - Recast the documentation to match the Road to 0.20.2 release script, spelling out the refreshed publishing expectations for this generator.
