@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import importlib
-from collections.abc import Sequence
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import TYPE_CHECKING, NoReturn
@@ -16,6 +15,8 @@ from x_make_common_x import exporters
 from x_make_markdown_x.x_cls_make_markdown_x import XClsMakeMarkdownX
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from _pytest.monkeypatch import MonkeyPatch
 
 
@@ -73,6 +74,7 @@ def test_to_pdf_requires_existing_wkhtmltopdf(
     with pytest.raises(RuntimeError, match="binary not found"):
         builder.to_pdf("<html></html>", str(tmp_path / "out.pdf"))
 
+
 def test_to_pdf_invokes_shared_exporter(tmp_path: Path) -> None:
     wkhtmltopdf = tmp_path / "wkhtmltopdf.exe"
     wkhtmltopdf.write_text("binary", encoding="utf-8")
@@ -93,9 +95,9 @@ def test_to_pdf_invokes_shared_exporter(tmp_path: Path) -> None:
     builder.to_pdf("<html><body>hi</body></html>", str(out_pdf))
 
     assert out_pdf.exists(), "PDF output file should be created"
-    assert builder.get_last_export_result() is not None
     last_result = builder.get_last_export_result()
-    assert last_result and last_result.succeeded is True
+    assert last_result is not None
+    assert last_result.succeeded is True
     assert captured["command"][-1].endswith("out.pdf")
 
 

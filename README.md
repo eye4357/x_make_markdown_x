@@ -3,10 +3,10 @@
 > "If the documentation isn't as tight as the cook, the operation falls apart. This rig keeps the words as sharp as the product."
 
 ## Manifesto
-x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.3 truth with consistent structure and zero wasted motion.
+x_make_markdown_x automates Markdown generation—component registries, PDF exports, accessibility linting, and more. It's how I broadcast the Road to 0.20.4 truth with consistent structure and zero wasted motion.
 
-## 0.20.3 Command Sequence
-Version 0.20.3 hardens every template against the JSON-first release. The generator now references the refreshed control room dossier and syncs with the visitor's per-file telemetry so documentation reflects the exact state of the lab.
+## 0.20.4 Command Sequence
+Version 0.20.4 welds the generator to the shared exporters in `x_make_common_x`. Markdown drops now flow through `export_markdown_to_pdf`, capture `ExportResult` metadata, and register deterministic PDF paths inside the orchestrator summary so the Kanban board shows hard evidence instead of fiction.
 
 ## Ingredients
 - Python 3.11+
@@ -31,7 +31,7 @@ Version 0.20.3 hardens every template against the JSON-first release. The genera
 
 ## Distribution Chain
 - [Changelog](./CHANGELOG.md)
-- [Road to 0.20.3 Control Room Ledger](../x_0_make_all_x/Change%20Control/0.20.3/Road%20to%200.20.3%20Engineering%20Proposal.md)
+- [Road to 0.20.4 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.4/Road%20to%200.20.4%20Engineering%20Proposal.md)
 - [Road to 0.20.3 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.3/Road%20to%200.20.3%20Engineering%20Proposal.md)
 
 ## Cross-Linked Intelligence

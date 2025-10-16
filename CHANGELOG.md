@@ -2,6 +2,11 @@
 
 All notable changes to x_make_markdown_x stay right here. We observe [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning because documentation deserves first-class control.
 
+## [0.20.4] - 2025-10-15
+### Changed
+- Routed Markdown publishing through the shared exporter suite, logging `ExportResult` metadata for the Kanban evidence trail.
+- README updated for the Road to 0.20.4 release to cover the exporter handoff and orchestrator summary wiring.
+
 ## [0.20.3] - 2025-10-14
 ### Changed
 - README and release notes rewritten to match the Road to 0.20.3 documentation cadence and acknowledge the JSON telemetry pivot.
