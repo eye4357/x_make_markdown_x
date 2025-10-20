@@ -1,0 +1,8 @@
+{
+  "status": "failure",
+  "message": "Failed to render markdown",
+  "details": {
+    "command": "wkhtmltopdf",
+    "exit_code": 2
+  }
+}

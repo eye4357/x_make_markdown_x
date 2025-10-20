@@ -1,0 +1,37 @@
+{
+  "command": "x_make_markdown_x",
+  "parameters": {
+    "output_markdown": "C:\\x_runner_x\\artifacts\\report.md",
+    "wkhtmltopdf_path": "C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe",
+    "export_pdf": true,
+    "document": {
+      "title": "Release Notes",
+      "subtitle": null,
+      "generated_at": "2025-10-18T00:00:00Z",
+      "include_toc": true,
+      "blocks": [
+        {
+          "kind": "header",
+          "text": "Release Notes",
+          "level": 1
+        },
+        {
+          "kind": "paragraph",
+          "text": "This release adds JSON contract validation."
+        },
+        {
+          "kind": "list",
+          "items": [
+            "Validate schemas",
+            "Run fixtures"
+          ],
+          "ordered": false
+        }
+      ]
+    },
+    "metadata": {
+      "release": "0.20.5",
+      "generated_by": "automation"
+    }
+  }
+}

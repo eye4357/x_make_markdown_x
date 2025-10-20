@@ -1,0 +1,34 @@
+{
+  "status": "success",
+  "schema_version": "x_make_markdown_x.run/1.0",
+  "generated_at": "2025-10-18T00:00:05Z",
+  "markdown": {
+    "path": "C:\\x_runner_x\\artifacts\\report.md",
+    "bytes": 2048,
+    "pdf": {
+      "exporter": "wkhtmltopdf",
+      "succeeded": true,
+      "output_path": "C:\\x_runner_x\\artifacts\\report.pdf",
+      "command": [
+        "wkhtmltopdf",
+        "--quiet",
+        "C:\\x_runner_x\\artifacts\\report.md",
+        "C:\\x_runner_x\\artifacts\\report.pdf"
+      ],
+      "stdout": "",
+      "stderr": "",
+      "inputs": {
+        "HTML": "C:\\x_runner_x\\artifacts\\report.html"
+      },
+      "binary_path": "C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe",
+      "detail": null
+    }
+  },
+  "summary": {
+    "sections": 3,
+    "words": 128
+  },
+  "messages": [
+    "Markdown exported successfully"
+  ]
+}

@@ -1,6 +1,6 @@
-# Changelog — Control Room Production Log
+# x_make_markdown_x — Production Ledger
 
-All notable changes to x_make_markdown_x stay right here. We observe [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning because documentation deserves first-class control.
+I document every meaningful shift to this documentation furnace here. Entries follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning so auditors can match published PDFs to the code revision that forged them.
 
 ## [0.20.4] - 2025-10-15
 ### Changed
@@ -9,7 +9,7 @@ All notable changes to x_make_markdown_x stay right here. We observe [Keep a Cha
 
 ## [0.20.3] - 2025-10-14
 ### Changed
-- README and release notes rewritten to match the Road to 0.20.3 documentation cadence and acknowledge the JSON telemetry pivot.
+- README and release notes rewritten to match the Road to 0.20.3 documentation cadence and acknowledge the JSON audit pivot.
 
 ## [0.20.2] - 2025-10-14
 ### Changed

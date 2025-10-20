@@ -8,20 +8,28 @@ Features (redrabbit):
 
 from __future__ import annotations
 
+import argparse
 import importlib
+import json
 import logging as _logging
 import os as _os
 import sys as _sys
+from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
 from typing import Protocol, TypeVar, cast
 
+from jsonschema import ValidationError  # type: ignore[import-untyped]
 from x_make_common_x.exporters import (
     CommandRunner,
     ExportResult,
     export_html_to_pdf,
     export_markdown_to_pdf,
 )
+from x_make_common_x.json_contracts import validate_payload
+from x_make_common_x.run_reports import isoformat_timestamp
+
+from x_make_markdown_x.json_contracts import ERROR_SCHEMA, INPUT_SCHEMA, OUTPUT_SCHEMA
 
 _LOGGER = _logging.getLogger("x_make")
 
@@ -238,7 +246,214 @@ class XClsMakeMarkdownX(BaseMake):
         return self._last_export_result
 
 
-if __name__ == "__main__":
+def _failure_payload(
+    message: str,
+    *,
+    details: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "status": "failure",
+        "message": message,
+    }
+    if details:
+        payload["details"] = dict(details)
+    try:
+        validate_payload(payload, ERROR_SCHEMA)
+    except ValidationError:
+        pass
+    return payload
+
+
+def _coerce_str_sequence(value: object) -> list[str]:
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [str(item) for item in value]
+    return []
+
+
+def _coerce_table_rows(value: object) -> list[list[str]]:
+    rows: list[list[str]] = []
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for entry in value:
+            if isinstance(entry, Sequence) and not isinstance(entry, (str, bytes, bytearray)):
+                rows.append([str(cell) for cell in entry])
+    return rows
+
+
+def _render_blocks(
+    builder: XClsMakeMarkdownX,
+    blocks: Sequence[object],
+) -> dict[str, int]:
+    processed = 0
+    headers = 0
+    for block in blocks:
+        if not isinstance(block, Mapping):
+            continue
+        processed += 1
+        kind = block.get("kind")
+        if kind == "header":
+            builder.add_header(
+                str(block.get("text", "")),
+                level=int(block.get("level", 1)),
+            )
+            headers += 1
+        elif kind == "paragraph":
+            builder.add_paragraph(str(block.get("text", "")))
+        elif kind == "table":
+            builder.add_table(
+                _coerce_str_sequence(block.get("headers")),
+                _coerce_table_rows(block.get("rows")),
+            )
+        elif kind == "image":
+            builder.add_image(
+                str(block.get("alt_text", "")),
+                str(block.get("url", "")),
+            )
+        elif kind == "list":
+            builder.add_list(
+                _coerce_str_sequence(block.get("items")),
+                ordered=bool(block.get("ordered", False)),
+            )
+        elif kind == "raw":
+            builder.elements.append(f"{block.get('text', '')!s}\n")
+        else:
+            continue
+    return {"blocks": processed, "headers": headers}
+
+
+def _resolve_wkhtmltopdf_path(candidate: object) -> str | None:
+    if isinstance(candidate, str) and candidate:
+        path = Path(candidate)
+        if path.is_file():
+            return str(path)
+    return None
+
+
+def main_json(
+    payload: Mapping[str, object],
+    *,
+    ctx: object | None = None,
+) -> dict[str, object]:
+    """Render markdown using the JSON contract."""
+
+    try:
+        validate_payload(payload, INPUT_SCHEMA)
+    except ValidationError as exc:
+        return _failure_payload(
+            "input payload failed validation",
+            details={
+                "error": exc.message,
+                "path": [str(part) for part in exc.path],
+                "schema_path": [str(part) for part in exc.schema_path],
+            },
+        )
+
+    parameters = cast("Mapping[str, object]", payload.get("parameters", {}))
+    output_markdown = parameters.get("output_markdown")
+    if not isinstance(output_markdown, str) or not output_markdown:
+        return _failure_payload(
+            "output_markdown is required",
+            details={"field": "output_markdown"},
+        )
+
+    export_pdf = bool(parameters.get("export_pdf", False))
+    wkhtmltopdf_candidate = parameters.get("wkhtmltopdf_path") if export_pdf else None
+    wkhtmltopdf_path = _resolve_wkhtmltopdf_path(wkhtmltopdf_candidate)
+    messages: list[str] = []
+    if export_pdf and wkhtmltopdf_candidate and wkhtmltopdf_path is None:
+        messages.append(
+            f"wkhtmltopdf not found at {wkhtmltopdf_candidate}; skipped PDF export"
+        )
+
+    builder = XClsMakeMarkdownX(wkhtmltopdf_path=wkhtmltopdf_path, ctx=ctx)
+
+    document = cast("Mapping[str, object]", parameters.get("document", {}))
+    blocks = cast("Sequence[object]", document.get("blocks", ()))
+    block_summary = _render_blocks(builder, blocks)
+    if bool(document.get("include_toc", False)):
+        builder.add_toc()
+
+    output_path = Path(output_markdown)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        markdown_text = builder.generate(output_file=str(output_path))
+    except Exception as exc:  # noqa: BLE001 - convert to JSON failure payload
+        return _failure_payload(
+            "markdown generation failed",
+            details={
+                "type": type(exc).__name__,
+                "message": str(exc),
+            },
+        )
+
+    artifact: dict[str, object] = {
+        "path": str(output_path),
+        "bytes": output_path.stat().st_size,
+    }
+
+    export_result = builder.get_last_export_result()
+    if export_result is not None:
+        artifact["pdf"] = export_result.to_metadata()
+        if not export_result.succeeded and export_result.detail:
+            messages.append(export_result.detail)
+
+    summary: dict[str, object] = {
+        "blocks": block_summary["blocks"],
+        "headers": block_summary["headers"],
+        "words": len(markdown_text.split()),
+    }
+    metadata_obj = parameters.get("metadata")
+    if isinstance(metadata_obj, Mapping):
+        summary["metadata"] = dict(cast("Mapping[str, object]", metadata_obj))
+
+    result: dict[str, object] = {
+        "status": "success",
+        "schema_version": "x_make_markdown_x.run/1.0",
+        "generated_at": isoformat_timestamp(),
+        "markdown": artifact,
+        "summary": summary,
+    }
+    if messages:
+        result["messages"] = messages
+
+    try:
+        validate_payload(result, OUTPUT_SCHEMA)
+    except ValidationError as exc:
+        return _failure_payload(
+            "generated output failed schema validation",
+            details={
+                "error": exc.message,
+                "path": [str(part) for part in exc.path],
+                "schema_path": [str(part) for part in exc.schema_path],
+            },
+        )
+
+    return result
+
+
+def _load_json_payload(file_path: str | None) -> Mapping[str, object]:
+    if file_path:
+        with Path(file_path).open("r", encoding="utf-8") as handle:
+            return cast("Mapping[str, object]", json.load(handle))
+    return cast("Mapping[str, object]", json.load(_sys.stdin))
+
+
+def _run_json_cli(args: Sequence[str]) -> None:
+    parser = argparse.ArgumentParser(description="x_make_markdown_x JSON runner")
+    parser.add_argument("--json", action="store_true", help="Read JSON payload from stdin")
+    parser.add_argument("--json-file", type=str, help="Path to JSON payload file")
+    parsed = parser.parse_args(args)
+
+    if not (parsed.json or parsed.json_file):
+        parser.error("JSON input required. Use --json for stdin or --json-file <path>.")
+
+    payload = _load_json_payload(parsed.json_file if parsed.json_file else None)
+    result = main_json(payload)
+    json.dump(result, _sys.stdout, indent=2)
+    _sys.stdout.write("\n")
+
+
+def _demo_markdown() -> None:
     # Rich example: Alice in Wonderland sampler -> Markdown + PDF beside this file
     base_dir = Path(__file__).resolve().parent
     out_dir = base_dir / "out_docs"
@@ -305,6 +520,11 @@ if __name__ == "__main__":
             "[markdown] PDF not generated: set "
             f"{XClsMakeMarkdownX.WKHTMLTOPDF_ENV_VAR} to wkhtmltopdf.exe"
         )
+if __name__ == "__main__":
+    _run_json_cli(_sys.argv[1:])
 
 
 x_cls_make_markdown_x = XClsMakeMarkdownX
+
+
+__all__ = ["BaseMake", "XClsMakeMarkdownX", "main_json", "x_cls_make_markdown_x"]
