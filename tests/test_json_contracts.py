@@ -80,7 +80,9 @@ def test_main_json_executes_happy_path(sample_input: dict[str, object]) -> None:
     assert status_value == "success"
 
 
-def test_main_json_returns_error_for_invalid_payload(sample_input: dict[str, object]) -> None:
+def test_main_json_returns_error_for_invalid_payload(
+    sample_input: dict[str, object],
+) -> None:
     invalid = copy.deepcopy(sample_input)
     parameters = invalid.get("parameters")
     if isinstance(parameters, dict):

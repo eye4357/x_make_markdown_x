@@ -274,7 +274,9 @@ def _coerce_table_rows(value: object) -> list[list[str]]:
     rows: list[list[str]] = []
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         for entry in value:
-            if isinstance(entry, Sequence) and not isinstance(entry, (str, bytes, bytearray)):
+            if isinstance(entry, Sequence) and not isinstance(
+                entry, (str, bytes, bytearray)
+            ):
                 rows.append([str(cell) for cell in entry])
     return rows
 
@@ -440,7 +442,9 @@ def _load_json_payload(file_path: str | None) -> Mapping[str, object]:
 
 def _run_json_cli(args: Sequence[str]) -> None:
     parser = argparse.ArgumentParser(description="x_make_markdown_x JSON runner")
-    parser.add_argument("--json", action="store_true", help="Read JSON payload from stdin")
+    parser.add_argument(
+        "--json", action="store_true", help="Read JSON payload from stdin"
+    )
     parser.add_argument("--json-file", type=str, help="Path to JSON payload file")
     parsed = parser.parse_args(args)
 
@@ -520,6 +524,8 @@ def _demo_markdown() -> None:
             "[markdown] PDF not generated: set "
             f"{XClsMakeMarkdownX.WKHTMLTOPDF_ENV_VAR} to wkhtmltopdf.exe"
         )
+
+
 if __name__ == "__main__":
     _run_json_cli(_sys.argv[1:])
 
