@@ -17,9 +17,10 @@ import sys as _sys
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
-from typing import Protocol, TypeVar, cast
+from types import MappingProxyType
+from typing import IO, Protocol, TypeVar, cast
 
-from jsonschema import ValidationError  # type: ignore[import-untyped]
+from jsonschema import ValidationError
 from x_make_common_x.exporters import (
     CommandRunner,
     ExportResult,
@@ -32,6 +33,10 @@ from x_make_common_x.run_reports import isoformat_timestamp
 from x_make_markdown_x.json_contracts import ERROR_SCHEMA, INPUT_SCHEMA, OUTPUT_SCHEMA
 
 _LOGGER = _logging.getLogger("x_make")
+
+ValidationErrorType: type[Exception] = ValidationError
+
+_EMPTY_MAPPING: Mapping[str, object] = MappingProxyType({})
 
 
 _T = TypeVar("_T")
@@ -72,7 +77,7 @@ def _emit_print(msg: str) -> bool:
 
 def _ctx_is_verbose(ctx: object | None) -> bool:
     """Return True if the context exposes a truthy `verbose` attribute."""
-    attr = cast("object", getattr(ctx, "verbose", False))
+    attr = getattr(ctx, "verbose", False)
     if isinstance(attr, bool):
         return attr
     return bool(attr)
@@ -257,28 +262,26 @@ def _failure_payload(
     }
     if details:
         payload["details"] = dict(details)
-    try:
+    with suppress(ValidationErrorType):
         validate_payload(payload, ERROR_SCHEMA)
-    except ValidationError:
-        pass
     return payload
 
 
 def _coerce_str_sequence(value: object) -> list[str]:
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [str(item) for item in value]
-    return []
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    return [str(item) for item in value]
 
 
 def _coerce_table_rows(value: object) -> list[list[str]]:
-    rows: list[list[str]] = []
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        for entry in value:
-            if isinstance(entry, Sequence) and not isinstance(
-                entry, (str, bytes, bytearray)
-            ):
-                rows.append([str(cell) for cell in entry])
-    return rows
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    return [
+        [str(cell) for cell in entry]
+        for entry in value
+        if isinstance(entry, Sequence)
+        and not isinstance(entry, (str, bytes, bytearray))
+    ]
 
 
 def _render_blocks(
@@ -330,13 +333,7 @@ def _resolve_wkhtmltopdf_path(candidate: object) -> str | None:
     return None
 
 
-def main_json(
-    payload: Mapping[str, object],
-    *,
-    ctx: object | None = None,
-) -> dict[str, object]:
-    """Render markdown using the JSON contract."""
-
+def _validate_input_schema(payload: Mapping[str, object]) -> dict[str, object] | None:
     try:
         validate_payload(payload, INPUT_SCHEMA)
     except ValidationError as exc:
@@ -348,15 +345,33 @@ def main_json(
                 "schema_path": [str(part) for part in exc.schema_path],
             },
         )
+    return None
 
-    parameters = cast("Mapping[str, object]", payload.get("parameters", {}))
-    output_markdown = parameters.get("output_markdown")
-    if not isinstance(output_markdown, str) or not output_markdown:
-        return _failure_payload(
-            "output_markdown is required",
-            details={"field": "output_markdown"},
-        )
 
+def _extract_parameters(payload: Mapping[str, object]) -> Mapping[str, object]:
+    raw_parameters = payload.get("parameters", {})
+    if isinstance(raw_parameters, Mapping):
+        return MappingProxyType(dict(raw_parameters))
+    return _EMPTY_MAPPING
+
+
+def _resolve_output_markdown(
+    parameters: Mapping[str, object],
+) -> Path | dict[str, object]:
+    output_markdown_obj = parameters.get("output_markdown")
+    if isinstance(output_markdown_obj, str) and output_markdown_obj:
+        return Path(output_markdown_obj)
+    return _failure_payload(
+        "output_markdown is required",
+        details={"field": "output_markdown"},
+    )
+
+
+def _configure_builder(
+    parameters: Mapping[str, object],
+    *,
+    ctx: object | None = None,
+) -> tuple[XClsMakeMarkdownX, list[str]]:
     export_pdf = bool(parameters.get("export_pdf", False))
     wkhtmltopdf_candidate = parameters.get("wkhtmltopdf_path") if export_pdf else None
     wkhtmltopdf_path = _resolve_wkhtmltopdf_path(wkhtmltopdf_candidate)
@@ -365,59 +380,91 @@ def main_json(
         messages.append(
             f"wkhtmltopdf not found at {wkhtmltopdf_candidate}; skipped PDF export"
         )
-
     builder = XClsMakeMarkdownX(wkhtmltopdf_path=wkhtmltopdf_path, ctx=ctx)
+    return builder, messages
 
-    document = cast("Mapping[str, object]", parameters.get("document", {}))
-    blocks = cast("Sequence[object]", document.get("blocks", ()))
-    block_summary = _render_blocks(builder, blocks)
-    if bool(document.get("include_toc", False)):
-        builder.add_toc()
 
-    output_path = Path(output_markdown)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+def _extract_document(parameters: Mapping[str, object]) -> Mapping[str, object]:
+    document_obj = parameters.get("document", {})
+    if isinstance(document_obj, Mapping):
+        return MappingProxyType(dict(document_obj))
+    return _EMPTY_MAPPING
 
-    try:
-        markdown_text = builder.generate(output_file=str(output_path))
-    except Exception as exc:  # noqa: BLE001 - convert to JSON failure payload
-        return _failure_payload(
-            "markdown generation failed",
-            details={
-                "type": type(exc).__name__,
-                "message": str(exc),
-            },
-        )
 
+def _extract_blocks(document: Mapping[str, object]) -> Sequence[object]:
+    blocks_obj = document.get("blocks", ())
+    if isinstance(blocks_obj, Sequence) and not isinstance(
+        blocks_obj, (str, bytes, bytearray)
+    ):
+        return tuple(blocks_obj)
+    return ()
+
+
+def _include_toc(document: Mapping[str, object]) -> bool:
+    return bool(document.get("include_toc", False))
+
+
+def _markdown_generation_failure(exc: Exception) -> dict[str, object]:
+    return _failure_payload(
+        "markdown generation failed",
+        details={
+            "type": type(exc).__name__,
+            "message": str(exc),
+        },
+    )
+
+
+def _build_artifact(
+    output_path: Path,
+    builder: XClsMakeMarkdownX,
+) -> tuple[dict[str, object], list[str]]:
     artifact: dict[str, object] = {
         "path": str(output_path),
         "bytes": output_path.stat().st_size,
     }
-
+    messages: list[str] = []
     export_result = builder.get_last_export_result()
     if export_result is not None:
         artifact["pdf"] = export_result.to_metadata()
         if not export_result.succeeded and export_result.detail:
             messages.append(export_result.detail)
+    return artifact, messages
 
+
+def _build_summary(
+    markdown_text: str,
+    block_summary: Mapping[str, int],
+    parameters: Mapping[str, object],
+) -> dict[str, object]:
     summary: dict[str, object] = {
-        "blocks": block_summary["blocks"],
-        "headers": block_summary["headers"],
+        "blocks": block_summary.get("blocks", 0),
+        "headers": block_summary.get("headers", 0),
         "words": len(markdown_text.split()),
     }
     metadata_obj = parameters.get("metadata")
     if isinstance(metadata_obj, Mapping):
-        summary["metadata"] = dict(cast("Mapping[str, object]", metadata_obj))
+        summary["metadata"] = dict(metadata_obj)
+    return summary
 
+
+def _compose_success_result(
+    artifact: Mapping[str, object],
+    summary: Mapping[str, object],
+    messages: Sequence[str],
+) -> dict[str, object]:
     result: dict[str, object] = {
         "status": "success",
         "schema_version": "x_make_markdown_x.run/1.0",
         "generated_at": isoformat_timestamp(),
-        "markdown": artifact,
-        "summary": summary,
+        "markdown": dict(artifact),
+        "summary": dict(summary),
     }
     if messages:
-        result["messages"] = messages
+        result["messages"] = list(messages)
+    return result
 
+
+def _validate_output_schema(result: Mapping[str, object]) -> dict[str, object] | None:
     try:
         validate_payload(result, OUTPUT_SCHEMA)
     except ValidationError as exc:
@@ -429,15 +476,66 @@ def main_json(
                 "schema_path": [str(part) for part in exc.schema_path],
             },
         )
+    return None
 
+
+def main_json(
+    payload: Mapping[str, object],
+    *,
+    ctx: object | None = None,
+) -> dict[str, object]:
+    """Render markdown using the JSON contract."""
+
+    schema_failure = _validate_input_schema(payload)
+    if schema_failure:
+        return schema_failure
+
+    parameters = _extract_parameters(payload)
+    resolved_output = _resolve_output_markdown(parameters)
+    if isinstance(resolved_output, dict):
+        return resolved_output
+    output_path = resolved_output
+
+    builder, messages = _configure_builder(parameters, ctx=ctx)
+
+    document = _extract_document(parameters)
+    blocks = _extract_blocks(document)
+    block_summary = _render_blocks(builder, blocks)
+    if _include_toc(document):
+        builder.add_toc()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        markdown_text = builder.generate(output_file=str(output_path))
+    except Exception as exc:  # noqa: BLE001 - convert to JSON failure payload
+        return _markdown_generation_failure(exc)
+
+    artifact, export_messages = _build_artifact(output_path, builder)
+    if export_messages:
+        messages.extend(export_messages)
+
+    summary = _build_summary(markdown_text, block_summary, parameters)
+    result = _compose_success_result(artifact, summary, messages)
+
+    output_failure = _validate_output_schema(result)
+    if output_failure:
+        return output_failure
     return result
 
 
 def _load_json_payload(file_path: str | None) -> Mapping[str, object]:
+    def _load_from_stream(stream: IO[str]) -> Mapping[str, object]:
+        payload_obj: object = json.load(stream)
+        if not isinstance(payload_obj, Mapping):
+            message = "JSON payload must be a mapping"
+            raise TypeError(message)
+        return MappingProxyType(dict(payload_obj))
+
     if file_path:
         with Path(file_path).open("r", encoding="utf-8") as handle:
-            return cast("Mapping[str, object]", json.load(handle))
-    return cast("Mapping[str, object]", json.load(_sys.stdin))
+            return _load_from_stream(handle)
+    return _load_from_stream(_sys.stdin)
 
 
 def _run_json_cli(args: Sequence[str]) -> None:
