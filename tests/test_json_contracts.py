@@ -3,8 +3,9 @@ from __future__ import annotations
 # ruff: noqa: S101 - assertions express expectations in test cases
 import copy
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import pytest
 from x_make_common_x.json_contracts import validate_payload, validate_schema
@@ -16,10 +17,8 @@ from x_make_markdown_x.json_contracts import (
 )
 from x_make_markdown_x.x_cls_make_markdown_x import main_json
 
-if TYPE_CHECKING:
-    pass
-else:
-    pytest = cast("Any", pytest)
+pytest = cast("Any", pytest)
+fixture = cast("Callable[..., Any]", pytest.fixture)
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "json_contracts"
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
@@ -31,17 +30,17 @@ def _load_fixture(name: str) -> dict[str, object]:
     return cast("dict[str, object]", data)
 
 
-@pytest.fixture(scope="module")
+@fixture(scope="module")
 def sample_input() -> dict[str, object]:
     return _load_fixture("input")
 
 
-@pytest.fixture(scope="module")
+@fixture(scope="module")
 def sample_output() -> dict[str, object]:
     return _load_fixture("output")
 
 
-@pytest.fixture(scope="module")
+@fixture(scope="module")
 def sample_error() -> dict[str, object]:
     return _load_fixture("error")
 
