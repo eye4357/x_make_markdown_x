@@ -3,9 +3,8 @@ from __future__ import annotations
 # ruff: noqa: S101 - assertions express expectations in test cases
 import copy
 import json
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import pytest
 from x_make_common_x.json_contracts import validate_payload, validate_schema
@@ -17,9 +16,6 @@ from x_make_markdown_x.json_contracts import (
 )
 from x_make_markdown_x.x_cls_make_markdown_x import main_json
 
-pytest = cast("Any", pytest)
-fixture = cast("Callable[..., Any]", pytest.fixture)
-
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "json_contracts"
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 
@@ -27,20 +23,23 @@ REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 def _load_fixture(name: str) -> dict[str, object]:
     with (FIXTURE_DIR / f"{name}.json").open("r", encoding="utf-8") as handle:
         data = json.load(handle)
+    if not isinstance(data, dict):
+        message = f"Fixture payload must be an object: {name}"
+        raise TypeError(message)
     return cast("dict[str, object]", data)
 
 
-@fixture(scope="module")
+@pytest.fixture(scope="module")  # type: ignore[misc]
 def sample_input() -> dict[str, object]:
     return _load_fixture("input")
 
 
-@fixture(scope="module")
+@pytest.fixture(scope="module")  # type: ignore[misc]
 def sample_output() -> dict[str, object]:
     return _load_fixture("output")
 
 
-@fixture(scope="module")
+@pytest.fixture(scope="module")  # type: ignore[misc]
 def sample_error() -> dict[str, object]:
     return _load_fixture("error")
 

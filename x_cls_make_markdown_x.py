@@ -18,7 +18,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
 from types import MappingProxyType
-from typing import IO, Protocol, TypeVar, cast
+from typing import IO, Protocol, cast
 
 from jsonschema import ValidationError
 from x_make_common_x.exporters import (
@@ -34,17 +34,14 @@ from x_make_markdown_x.json_contracts import ERROR_SCHEMA, INPUT_SCHEMA, OUTPUT_
 
 _LOGGER = _logging.getLogger("x_make")
 
-ValidationErrorType: type[Exception] = ValidationError
+ValidationErrorType = cast("type[Exception]", ValidationError)
 
-_EMPTY_MAPPING: Mapping[str, object] = MappingProxyType({})
-
-
-_T = TypeVar("_T")
+_EMPTY_MAPPING: Mapping[str, object] = MappingProxyType(cast("dict[str, object]", {}))
 
 
 class BaseMake:
     @classmethod
-    def get_env(cls, name: str, default: _T | None = None) -> str | _T | None:
+    def get_env(cls, name: str, default: str | None = None) -> str | None:
         value = _os.environ.get(name)
         if value is None:
             return default
@@ -349,9 +346,10 @@ def _validate_input_schema(payload: Mapping[str, object]) -> dict[str, object] |
 
 
 def _extract_parameters(payload: Mapping[str, object]) -> Mapping[str, object]:
-    raw_parameters = payload.get("parameters", {})
+    raw_parameters = payload.get("parameters")
     if isinstance(raw_parameters, Mapping):
-        return MappingProxyType(dict(raw_parameters))
+        typed_parameters = cast("Mapping[str, object]", raw_parameters)
+        return MappingProxyType(dict(typed_parameters))
     return _EMPTY_MAPPING
 
 
@@ -385,14 +383,15 @@ def _configure_builder(
 
 
 def _extract_document(parameters: Mapping[str, object]) -> Mapping[str, object]:
-    document_obj = parameters.get("document", {})
+    document_obj = parameters.get("document")
     if isinstance(document_obj, Mapping):
-        return MappingProxyType(dict(document_obj))
+        typed_document = cast("Mapping[str, object]", document_obj)
+        return MappingProxyType(dict(typed_document))
     return _EMPTY_MAPPING
 
 
 def _extract_blocks(document: Mapping[str, object]) -> Sequence[object]:
-    blocks_obj = document.get("blocks", ())
+    blocks_obj = document.get("blocks")
     if isinstance(blocks_obj, Sequence) and not isinstance(
         blocks_obj, (str, bytes, bytearray)
     ):
@@ -437,13 +436,14 @@ def _build_summary(
     parameters: Mapping[str, object],
 ) -> dict[str, object]:
     summary: dict[str, object] = {
-        "blocks": block_summary.get("blocks", 0),
-        "headers": block_summary.get("headers", 0),
+        "blocks": int(block_summary.get("blocks", 0)),
+        "headers": int(block_summary.get("headers", 0)),
         "words": len(markdown_text.split()),
     }
     metadata_obj = parameters.get("metadata")
     if isinstance(metadata_obj, Mapping):
-        summary["metadata"] = dict(metadata_obj)
+        typed_metadata = cast("Mapping[str, object]", metadata_obj)
+        summary["metadata"] = dict(typed_metadata)
     return summary
 
 
@@ -530,7 +530,8 @@ def _load_json_payload(file_path: str | None) -> Mapping[str, object]:
         if not isinstance(payload_obj, Mapping):
             message = "JSON payload must be a mapping"
             raise TypeError(message)
-        return MappingProxyType(dict(payload_obj))
+        typed_payload = cast("Mapping[str, object]", payload_obj)
+        return MappingProxyType(dict(typed_payload))
 
     if file_path:
         with Path(file_path).open("r", encoding="utf-8") as handle:
