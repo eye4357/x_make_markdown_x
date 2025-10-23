@@ -3,8 +3,9 @@ from __future__ import annotations
 # ruff: noqa: S101 - assertions express expectations in test cases
 import copy
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, ParamSpec, TypeVar, cast
 
 import pytest
 from x_make_common_x.json_contracts import validate_payload, validate_schema
@@ -15,6 +16,34 @@ from x_make_markdown_x.json_contracts import (
     OUTPUT_SCHEMA,
 )
 from x_make_markdown_x.x_cls_make_markdown_x import main_json
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+else:  # pragma: no cover - runtime typing fallback
+    import typing
+
+    Callable = typing.Callable
+
+
+if TYPE_CHECKING:
+
+    def typed_fixture(
+        *_args: object, **_kwargs: object
+    ) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]: ...
+
+else:
+
+    def typed_fixture(
+        *args: object, **kwargs: object
+    ) -> Callable[[Callable[_P, _T]], Callable[_P, _T]]:
+        def _decorate(func: Callable[_P, _T]) -> Callable[_P, _T]:
+            decorated = pytest.fixture(*args, **kwargs)(func)
+            return cast("Callable[_P, _T]", decorated)
+
+        return _decorate
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "json_contracts"
 REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
@@ -29,17 +58,17 @@ def _load_fixture(name: str) -> dict[str, object]:
     return cast("dict[str, object]", data)
 
 
-@pytest.fixture(scope="module")  # type: ignore[misc]
+@typed_fixture(scope="module")
 def sample_input() -> dict[str, object]:
     return _load_fixture("input")
 
 
-@pytest.fixture(scope="module")  # type: ignore[misc]
+@typed_fixture(scope="module")
 def sample_output() -> dict[str, object]:
     return _load_fixture("output")
 
 
-@pytest.fixture(scope="module")  # type: ignore[misc]
+@typed_fixture(scope="module")
 def sample_error() -> dict[str, object]:
     return _load_fixture("error")
 
@@ -67,8 +96,13 @@ def test_existing_reports_align_with_schema() -> None:
         pytest.skip("no markdown run reports to validate")
     for report_file in report_files:
         with report_file.open("r", encoding="utf-8") as handle:
-            payload = cast("dict[str, object]", json.load(handle))
-        validate_payload(payload, OUTPUT_SCHEMA)
+            payload_obj: object = json.load(handle)
+        if isinstance(payload_obj, Mapping):
+            payload_map = cast("Mapping[str, object]", payload_obj)
+            validate_payload(dict(payload_map), OUTPUT_SCHEMA)
+        else:
+            message = f"Report {report_file.name} must contain a JSON object"
+            raise AssertionError(message)
 
 
 def test_main_json_executes_happy_path(sample_input: dict[str, object]) -> None:
@@ -83,9 +117,12 @@ def test_main_json_returns_error_for_invalid_payload(
     sample_input: dict[str, object],
 ) -> None:
     invalid = copy.deepcopy(sample_input)
-    parameters = invalid.get("parameters")
-    if isinstance(parameters, dict):
-        parameters.pop("output_markdown", None)
+    parameters_obj = invalid.get("parameters")
+    if not isinstance(parameters_obj, dict):
+        parameters_obj = {}
+        invalid["parameters"] = parameters_obj
+    parameters = cast("dict[str, object]", parameters_obj)
+    parameters.pop("output_markdown", None)
     result = main_json(invalid)
     validate_payload(result, ERROR_SCHEMA)
     status_value = result.get("status")

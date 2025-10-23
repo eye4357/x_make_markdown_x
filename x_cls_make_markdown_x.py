@@ -74,10 +74,10 @@ def _emit_print(msg: str) -> bool:
 
 def _ctx_is_verbose(ctx: object | None) -> bool:
     """Return True if the context exposes a truthy `verbose` attribute."""
-    attr = getattr(ctx, "verbose", False)
-    if isinstance(attr, bool):
-        return attr
-    return bool(attr)
+    verbose_attr: object = getattr(ctx, "verbose", False)
+    if isinstance(verbose_attr, bool):
+        return verbose_attr
+    return bool(verbose_attr)
 
 
 # red rabbit 2025_0902_0944
@@ -281,6 +281,37 @@ def _coerce_table_rows(value: object) -> list[list[str]]:
     ]
 
 
+def _stringify(value: object, *, default: str = "") -> str:
+    return str(value) if value is not None else default
+
+
+def _coerce_int(value: object, *, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _coerce_bool(value: object, *, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
 def _render_blocks(
     builder: XClsMakeMarkdownX,
     blocks: Sequence[object],
@@ -290,33 +321,35 @@ def _render_blocks(
     for block in blocks:
         if not isinstance(block, Mapping):
             continue
+        block_map = cast("Mapping[str, object]", block)
         processed += 1
-        kind = block.get("kind")
+        kind_obj = block_map.get("kind")
+        kind = kind_obj if isinstance(kind_obj, str) else None
         if kind == "header":
             builder.add_header(
-                str(block.get("text", "")),
-                level=int(block.get("level", 1)),
+                _stringify(block_map.get("text")),
+                level=_coerce_int(block_map.get("level"), default=1),
             )
             headers += 1
         elif kind == "paragraph":
-            builder.add_paragraph(str(block.get("text", "")))
+            builder.add_paragraph(_stringify(block_map.get("text")))
         elif kind == "table":
             builder.add_table(
-                _coerce_str_sequence(block.get("headers")),
-                _coerce_table_rows(block.get("rows")),
+                _coerce_str_sequence(block_map.get("headers")),
+                _coerce_table_rows(block_map.get("rows")),
             )
         elif kind == "image":
             builder.add_image(
-                str(block.get("alt_text", "")),
-                str(block.get("url", "")),
+                _stringify(block_map.get("alt_text")),
+                _stringify(block_map.get("url")),
             )
         elif kind == "list":
             builder.add_list(
-                _coerce_str_sequence(block.get("items")),
-                ordered=bool(block.get("ordered", False)),
+                _coerce_str_sequence(block_map.get("items")),
+                ordered=_coerce_bool(block_map.get("ordered"), default=False),
             )
         elif kind == "raw":
-            builder.elements.append(f"{block.get('text', '')!s}\n")
+            builder.elements.append(f"{_stringify(block_map.get('text'))}\n")
         else:
             continue
     return {"blocks": processed, "headers": headers}
@@ -546,13 +579,17 @@ def _run_json_cli(args: Sequence[str]) -> None:
     )
     parser.add_argument("--json-file", type=str, help="Path to JSON payload file")
     parsed = parser.parse_args(args)
+    parsed_map = cast("dict[str, object]", vars(parsed))
+    json_flag = bool(parsed_map.get("json", False))
+    json_file_obj = parsed_map.get("json_file")
+    json_file = json_file_obj if isinstance(json_file_obj, str) and json_file_obj else None
 
-    if not (parsed.json or parsed.json_file):
+    if not (json_flag or json_file):
         parser.error("JSON input required. Use --json for stdin or --json-file <path>.")
 
-    payload = _load_json_payload(parsed.json_file if parsed.json_file else None)
+    payload = _load_json_payload(json_file)
     result = main_json(payload)
-    json.dump(result, _sys.stdout, indent=2)
+    _sys.stdout.write(json.dumps(result, indent=2))
     _sys.stdout.write("\n")
 
 
