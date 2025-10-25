@@ -449,6 +449,7 @@ def _extract_blocks(document: Mapping[str, object]) -> Sequence[object]:
         return tuple(blocks_obj)
     return ()
 
+
 def _include_toc(document: Mapping[str, object]) -> bool:
     return bool(document.get("include_toc", False))
 
