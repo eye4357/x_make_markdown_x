@@ -20,7 +20,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import IO, Protocol, cast
 
-from jsonschema import ValidationError
 from x_make_common_x.exporters import (
     CommandRunner,
     ExportResult,
@@ -34,7 +33,25 @@ from x_make_markdown_x.json_contracts import ERROR_SCHEMA, INPUT_SCHEMA, OUTPUT_
 
 _LOGGER = _logging.getLogger("x_make")
 
-ValidationErrorType = cast("type[Exception]", ValidationError)
+
+class _SchemaValidationError(Exception):
+    message: str
+    path: tuple[object, ...]
+    schema_path: tuple[object, ...]
+
+
+class _JsonSchemaModule(Protocol):
+    ValidationError: type[_SchemaValidationError]
+
+
+def _load_validation_error() -> type[_SchemaValidationError]:
+    """Import jsonschema.ValidationError without requiring bundled stubs."""
+
+    module = cast("_JsonSchemaModule", importlib.import_module("jsonschema"))
+    return module.ValidationError
+
+
+ValidationErrorType: type[_SchemaValidationError] = _load_validation_error()
 
 _EMPTY_MAPPING: Mapping[str, object] = MappingProxyType(cast("dict[str, object]", {}))
 
@@ -366,13 +383,14 @@ def _resolve_wkhtmltopdf_path(candidate: object) -> str | None:
 def _validate_input_schema(payload: Mapping[str, object]) -> dict[str, object] | None:
     try:
         validate_payload(payload, INPUT_SCHEMA)
-    except ValidationError as exc:
+    except ValidationErrorType as exc:
+        error = exc
         return _failure_payload(
             "input payload failed validation",
             details={
-                "error": exc.message,
-                "path": [str(part) for part in exc.path],
-                "schema_path": [str(part) for part in exc.schema_path],
+                "error": error.message,
+                "path": [str(part) for part in error.path],
+                "schema_path": [str(part) for part in error.schema_path],
             },
         )
     return None
@@ -430,7 +448,6 @@ def _extract_blocks(document: Mapping[str, object]) -> Sequence[object]:
     ):
         return tuple(blocks_obj)
     return ()
-
 
 def _include_toc(document: Mapping[str, object]) -> bool:
     return bool(document.get("include_toc", False))
@@ -500,13 +517,14 @@ def _compose_success_result(
 def _validate_output_schema(result: Mapping[str, object]) -> dict[str, object] | None:
     try:
         validate_payload(result, OUTPUT_SCHEMA)
-    except ValidationError as exc:
+    except ValidationErrorType as exc:
+        error = exc
         return _failure_payload(
             "generated output failed schema validation",
             details={
-                "error": exc.message,
-                "path": [str(part) for part in exc.path],
-                "schema_path": [str(part) for part in exc.schema_path],
+                "error": error.message,
+                "path": [str(part) for part in error.path],
+                "schema_path": [str(part) for part in error.schema_path],
             },
         )
     return None
@@ -582,7 +600,9 @@ def _run_json_cli(args: Sequence[str]) -> None:
     parsed_map = cast("dict[str, object]", vars(parsed))
     json_flag = bool(parsed_map.get("json", False))
     json_file_obj = parsed_map.get("json_file")
-    json_file = json_file_obj if isinstance(json_file_obj, str) and json_file_obj else None
+    json_file = (
+        json_file_obj if isinstance(json_file_obj, str) and json_file_obj else None
+    )
 
     if not (json_flag or json_file):
         parser.error("JSON input required. Use --json for stdin or --json-file <path>.")
