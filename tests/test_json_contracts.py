@@ -5,7 +5,7 @@ import copy
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
+from typing import Final, cast
 
 import pytest
 from x_make_common_x.json_contracts import validate_payload, validate_schema
@@ -23,16 +23,19 @@ REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 
 def _load_fixture(name: str) -> dict[str, object]:
     with (FIXTURE_DIR / f"{name}.json").open("r", encoding="utf-8") as handle:
-        data = json.load(handle)
-    if not isinstance(data, dict):
+        raw_payload = cast("object", json.load(handle))
+    if not isinstance(raw_payload, dict):
         message = f"Fixture payload must be an object: {name}"
         raise TypeError(message)
-    return cast("dict[str, object]", data)
+    typed_payload: dict[str, object] = {}
+    for key, value in raw_payload.items():
+        typed_payload[str(key)] = value
+    return typed_payload
 
 
-SAMPLE_INPUT = _load_fixture("input")
-SAMPLE_OUTPUT = _load_fixture("output")
-SAMPLE_ERROR = _load_fixture("error")
+SAMPLE_INPUT: Final[dict[str, object]] = _load_fixture("input")
+SAMPLE_OUTPUT: Final[dict[str, object]] = _load_fixture("output")
+SAMPLE_ERROR: Final[dict[str, object]] = _load_fixture("error")
 
 
 def test_schemas_are_valid() -> None:
