@@ -31,18 +31,8 @@ Use the CLI to enumerate recipes, generate Markdown payloads, and produce PDFs t
 | Static contract scan | `python -m pyright` |
 | Functional verification | `pytest` |
 
-## System Linkage
-- [Changelog](./CHANGELOG.md)
-- [Road to 0.20.4 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.4/Road%20to%200.20.4%20Engineering%20Proposal.md)
-- [Road to 0.20.3 Engineering Proposal](../x_0_make_all_x/Change%20Control/0.20.3/Road%20to%200.20.3%20Engineering%20Proposal.md)
-
 ## Reconstitution Drill
 On the monthly rebuild I install wkhtmltopdf on a fresh machine, run this furnace, and verify Markdown and PDF artefacts align with orchestrator summaries. Binary versions and runtimes are logged; any drift feeds back into Change Control before the next release window.
-
-## Cross-Referenced Assets
-- [x_make_graphviz_x](../x_make_graphviz_x/README.md) — supplies diagrams injected into generated documents.
-- [x_make_mermaid_x](../x_make_mermaid_x/README.md) — produces Mermaid storyboards that this furnace packages.
-- [x_0_make_all_x](../x_0_make_all_x/README.md) — orchestrator that distributes these outputs to stakeholders.
 
 ## Conduct Code
 Document every new template, exporter, or lint rule in Change Control. Run the QA slate before touching production. Words are evidence; treat them with the same rigor as lab results.
